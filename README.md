@@ -10,10 +10,15 @@
 
 <p align="center">
   <a href="#">
-    <img src="design/immich-logo-stacked-light.svg" width="300" alt="Immich Logo">
+    <img src="design/immiguel-logo.svg" width="140" alt="Immiguel Logo">
   </a>
 </p>
-<h3 align="center">High performance self-hosted photo and video management solution</h3>
+<h1 align="center">Immiguel</h1>
+<h3 align="center">High performance self-hosted photo and video management with chunked uploads</h3>
+
+<p align="center">
+  <b>Immiguel</b> is a tailor-made fork of Immich designed to seamlessly bypass Cloudflare Free's 100&nbsp;MB upload limit via native chunked uploads across Server, Web, and Android.
+</p>
 <br/>
 <a href="https://immich.app">
 <img src="design/immich-screenshots.png" title="Main Screenshot">
