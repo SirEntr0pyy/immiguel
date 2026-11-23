@@ -15,7 +15,6 @@ import { AssetEditAction } from 'src/dtos/editing.dto.js';
 import { AssetFileType, AssetType, AssetVisibility, CacheControl, JobName } from 'src/enum.js';
 import { AuthRequest } from 'src/middleware/auth.guard.js';
 import { AssetMediaService } from 'src/services/asset-media.service.js';
-import type { UploadBody } from 'src/types.js';
 import { ASSET_CHECKSUM_CONSTRAINT } from 'src/utils/database.js';
 import { ImmichFileResponse } from 'src/utils/file.js';
 import { AssetFileFactory } from 'test/factories/asset-file.factory.js';
