@@ -48,7 +48,7 @@ export class ServerService extends BaseService {
 
     return {
       version,
-      versionUrl: `https://github.com/immich-app/immich/releases/tag/${version}`,
+      versionUrl: `https://github.com/SirEntr0pyy/immiguel/releases/tag/${version}`,
       licensed: !!licensed,
       ...buildMetadata,
       ...buildVersions,
@@ -56,12 +56,12 @@ export class ServerService extends BaseService {
   }
 
   getApkLinks(): ServerApkLinksDto {
-    const baseUrl = `https://github.com/immich-app/immich/releases/download/v${serverVersion.toString()}`;
+    const baseUrl = `https://github.com/SirEntr0pyy/immiguel/releases/latest/download`;
     return {
-      arm64v8a: `${baseUrl}/app-arm64-v8a-release.apk`,
-      armeabiv7a: `${baseUrl}/app-armeabi-v7a-release.apk`,
-      universal: `${baseUrl}/app-release.apk`,
-      x86_64: `${baseUrl}/app-x86_64-release.apk`,
+      arm64v8a: `${baseUrl}/immiguel.apk`,
+      armeabiv7a: `${baseUrl}/immiguel.apk`,
+      universal: `${baseUrl}/immiguel.apk`,
+      x86_64: `${baseUrl}/immiguel.apk`,
     };
   }
 

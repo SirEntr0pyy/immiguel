@@ -341,7 +341,7 @@ const getEnv = (): EnvData => {
     licensePublicKey: isProd ? productionKeys : stagingKeys,
 
     versionCheck: {
-      url: isProd ? 'https://version.immich.cloud/version' : 'https://version.dev.immich.cloud/version',
+      url: process.env.IMMICH_VERSION_CHECK_URL ?? 'https://api.github.com/repos/SirEntr0pyy/immiguel/releases/latest',
     },
 
     network: {

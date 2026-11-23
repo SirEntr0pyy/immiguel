@@ -59,23 +59,34 @@ export class ServerInfoRepository {
     try {
       const { versionCheck } = this.configRepository.getEnv();
       const url = new URL(versionCheck.url);
-      switch (channel) {
-        case ReleaseChannel.Stable: {
-          url.searchParams.append('channel', 'stable');
-          break;
-        }
-        case ReleaseChannel.ReleaseCandidate: {
-          url.searchParams.append('channel', 'rc');
-          break;
+      if (url.hostname.includes('immich.cloud')) {
+        switch (channel) {
+          case ReleaseChannel.Stable: {
+            url.searchParams.append('channel', 'stable');
+            break;
+          }
+          case ReleaseChannel.ReleaseCandidate: {
+            url.searchParams.append('channel', 'rc');
+            break;
+          }
         }
       }
-      const response = await fetch(url);
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Immiguel-Server',
+          Accept: 'application/json',
+        },
+      });
 
       if (!response.ok) {
         throw new Error(`Version check request failed with status ${response.status}: ${await response.text()}`);
       }
 
-      return response.json();
+      const json = (await response.json()) as Record<string, unknown>;
+      return {
+        version: String(json.version ?? json.tag_name ?? ''),
+        published_at: String(json.published_at ?? new Date().toISOString()),
+      };
     } catch (error) {
       throw new Error('Failed to fetch latest release', { cause: error });
     }

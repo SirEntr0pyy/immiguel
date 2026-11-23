@@ -18,11 +18,11 @@
 <Modal title={$t('about')} {onClose}>
   <ModalBody>
     <div class="flex flex-col gap-4 sm:grid sm:grid-cols-2">
-      {#if info.sourceRef === 'main' && info.repository === 'immich-app/immich'}
+      {#if info.sourceRef === 'main' && (info.repository === 'SirEntr0pyy/immiguel' || info.repository === 'immich-app/immich')}
         <Alert color="warning" title={$t('main_branch_warning')} class="col-span-full" size="small" />
       {/if}
 
-      <ServerAboutItem id="immich" title="Immich" version={info.version} versionHref={info.versionUrl} />
+      <ServerAboutItem id="immich" title="Immiguel" version={info.version} versionHref={info.versionUrl} />
       <ServerAboutItem id="exif" title="ExifTool" version={info.exiftool} />
       <ServerAboutItem id="nodejs" title="Node.js" version={info.nodejs} />
       <ServerAboutItem id="libvips" title="Libvips" version={info.libvips} />

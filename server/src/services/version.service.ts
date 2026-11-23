@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DateTime } from 'luxon';
-import { SemVer, diff, intersects, lt } from 'semver';
+import { SemVer, coerce, diff, gt, intersects, lt } from 'semver';
 import { serverVersion } from 'src/constants.js';
 import { OnEvent, OnJob } from 'src/decorators.js';
 import { ReleaseEventV1, ReleaseType, ServerVersionResponseDto } from 'src/dtos/server.dto.js';
@@ -23,15 +23,23 @@ const asNotification = (
   channel: ReleaseChannel,
   { checkedAt, releaseVersion }: VersionCheckMetadata,
 ): ReleaseEventV1 => {
+  const parsedRelease = coerce(releaseVersion) ?? new SemVer(releaseVersion);
+  let isAvailable = false;
+  try {
+    isAvailable =
+      intersects(`>${serverVersion}`, releaseVersion, {
+        includePrerelease: channel === ReleaseChannel.ReleaseCandidate,
+      }) || gt(parsedRelease, serverVersion);
+  } catch {
+    isAvailable = gt(parsedRelease, serverVersion);
+  }
+
   return {
-    // can't use gt because it's broken for release candidates F https://github.com/npm/node-semver/issues/483
-    isAvailable: intersects(`>${serverVersion}`, releaseVersion, {
-      includePrerelease: channel === ReleaseChannel.ReleaseCandidate,
-    }),
+    isAvailable,
     checkedAt,
     serverVersion: ServerVersionResponseDto.fromSemVer(serverVersion),
-    releaseVersion: ServerVersionResponseDto.fromSemVer(new SemVer(releaseVersion)),
-    type: diff(serverVersion, releaseVersion) as ReleaseType,
+    releaseVersion: ServerVersionResponseDto.fromSemVer(parsedRelease),
+    type: (diff(serverVersion, parsedRelease) as ReleaseType) ?? 'patch',
   };
 };
 
@@ -127,12 +135,18 @@ export class VersionService extends BaseService {
 
       await this.systemMetadataRepository.set(SystemMetadataKey.VersionCheckState, metadata);
 
-      // can't use gt because it's broken for release candidates F https://github.com/npm/node-semver/issues/483
-      if (
-        intersects(`>${serverVersion}`, releaseVersion, {
-          includePrerelease: newVersionCheck.channel === ReleaseChannel.ReleaseCandidate,
-        })
-      ) {
+      const parsedRelease = coerce(releaseVersion) ?? new SemVer(releaseVersion);
+      let isNew = false;
+      try {
+        isNew =
+          intersects(`>${serverVersion}`, releaseVersion, {
+            includePrerelease: newVersionCheck.channel === ReleaseChannel.ReleaseCandidate,
+          }) || gt(parsedRelease, serverVersion);
+      } catch {
+        isNew = gt(parsedRelease, serverVersion);
+      }
+
+      if (isNew) {
         this.logger.log(`Found ${releaseVersion}, released at ${new Date(publishedAt).toLocaleString()}`);
         this.websocketRepository.clientBroadcast('on_new_release', asNotification(newVersionCheck.channel, metadata));
       }
