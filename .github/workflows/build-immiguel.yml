@@ -93,6 +93,8 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: ''
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
