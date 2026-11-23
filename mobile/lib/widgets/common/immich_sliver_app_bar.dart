@@ -91,9 +91,27 @@ class _ImmichLogoWithText extends StatelessWidget {
   Widget build(BuildContext context) => AnimatedOpacity(
     opacity: IconTheme.of(context).opacity ?? 1,
     duration: kThemeChangeDuration,
-    child: SvgPicture.asset(
-      context.isDarkTheme ? 'assets/immich-logo-inline-dark.svg' : 'assets/immich-logo-inline-light.svg',
-      height: 40,
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        SvgPicture.asset(
+          'assets/immich-logo.svg',
+          height: 28,
+          width: 28,
+        ),
+        const SizedBox(width: 8),
+        Text(
+          'immiguel',
+          style: TextStyle(
+            fontFamily: 'GoogleSans',
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: context.colorScheme.onSurface,
+            letterSpacing: -0.5,
+          ),
+        ),
+      ],
     ),
   );
 }

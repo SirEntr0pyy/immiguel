@@ -29,7 +29,7 @@ class ServerUpdateNotification extends HookConsumerWidget {
         if (Platform.isIOS) {
           url = kImmichAppStoreLink;
         } else if (Platform.isAndroid) {
-          url = kImmichPlayStoreLink;
+          url = kImmichLatestRelease;
         } else {
           // Fallback to latest release for other/unknown platforms
           url = kImmichLatestRelease;
