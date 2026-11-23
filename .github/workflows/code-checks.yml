@@ -1,0 +1,72 @@
+name: Code Quality & Checks
+
+on:
+  push:
+    branches: [main, 'feat/*']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  type-check:
+    name: TypeScript & Linters
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Enable Corepack & pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@latest --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build SDKs
+        run: |
+          pnpm --filter @immich/sdk build
+          pnpm --filter @immich/plugin-sdk build
+
+      - name: Check Server TypeScript
+        run: pnpm --filter immich check
+
+      - name: Check Web Build
+        run: pnpm --filter immich-web build
+
+  mobile-analyze:
+    name: Mobile Dart Analysis
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./mobile
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Mise
+        uses: jdx/mise-action@v2
+        with:
+          install: true
+          cache: true
+
+      - name: Install dependencies
+        run: mise //mobile:install:ci
+
+      - name: Install dependencies for UI package
+        run: flutter pub get --enforce-lockfile
+        working-directory: ./mobile/packages/ui
+
+      - name: Perform codegen
+        run: mise //mobile:codegen
+
+      - name: Run flutter analyze
+        run: flutter analyze

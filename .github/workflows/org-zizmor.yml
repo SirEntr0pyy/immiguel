@@ -1,0 +1,26 @@
+name: Zizmor
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  zizmor:
+    name: Zizmor
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Run Zizmor
+        uses: woodruffw/zizmor-action@v1
+        with:
+          gh-token: ${{ secrets.GITHUB_TOKEN }}

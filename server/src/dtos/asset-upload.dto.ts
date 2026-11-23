@@ -1,4 +1,4 @@
-import { createZodDto } from 'nestjs-zod';
+import { createZodDto } from '@immich/nestjs-standard-schema/zod';
 import z from 'zod';
 import { AssetMetadataUpsertItemSchema } from 'src/dtos/asset.dto.js';
 import { AssetVisibilitySchema } from 'src/enum.js';
