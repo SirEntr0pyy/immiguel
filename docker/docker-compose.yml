@@ -7,11 +7,11 @@
 #
 # The compose file on main may not be compatible with the latest release.
 
-name: immiguel
+name: immich
 
 services:
-  immiguel-server:
-    container_name: immiguel_server
+  immich-server:
+    container_name: immich_server
     image: ghcr.io/sirentr0pyy/immiguel-server:${IMMIGUEL_VERSION:-latest}
     # extends:
     #   file: hwaccel.transcoding.yml
@@ -31,8 +31,8 @@ services:
     healthcheck:
       disable: false
 
-  immiguel-machine-learning:
-    container_name: immiguel_machine_learning
+  immich-machine-learning:
+    container_name: immich_machine_learning
     # For hardware acceleration, add one of -[armnn, cuda, rocm, openvino, rknn] to the image tag.
     # Example tag: ${IMMICH_VERSION:-release}-cuda
     image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}
@@ -50,14 +50,14 @@ services:
       disable: false
 
   redis:
-    container_name: immiguel_redis
+    container_name: immich_redis
     image: docker.io/valkey/valkey:9@sha256:3add1a336a920ea54770a001ab6feb3da5fceea96a40373a3a2cd469b815f0b7
     healthcheck:
       test: redis-cli ping | grep -q PONG || exit 1
     restart: always
 
   database:
-    container_name: immiguel_postgres
+    container_name: immich_postgres
     image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0@sha256:bcf63357191b76a916ae5eb93464d65c07511da41e3bf7a8416db519b40b1c23
     environment:
       POSTGRES_PASSWORD: ${DB_PASSWORD}

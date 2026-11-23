@@ -38,15 +38,21 @@
 
 ## Quick Start (Docker Compose)
 
-Running Immiguel is a drop-in replacement for standard Immich:
+Running Immiguel is a 100% drop-in replacement for official Immich. You use the standard official Immich stack and **only swap the server image**:
 
 ```yaml
+#
+# Immiguel Stack (Drop-in replacement for official Immich)
+# Only the server image is changed to Immiguel to support native chunked uploads!
+#
+name: immich
+
 services:
-  immiguel-server:
-    container_name: immiguel_server
-    image: ghcr.io/sirentr0pyy/immiguel-server:latest
+  immich-server:
+    container_name: immich_server
+    image: ghcr.io/sirentr0pyy/immiguel-server:latest # <--- Only this image is from Immiguel
     volumes:
-      - ${UPLOAD_LOCATION}:/usr/src/app/upload
+      - ${UPLOAD_LOCATION}:/data
       - /etc/localtime:/etc/localtime:ro
     env_file:
       - .env
@@ -56,14 +62,57 @@ services:
       - redis
       - database
     restart: always
+    healthcheck:
+      disable: false
 
-  immiguel-machine-learning:
-    container_name: immiguel_machine_learning
-    image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}
+  immich-machine-learning:
+    container_name: immich_machine_learning
+    image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release} # Official Immich ML
     volumes:
       - model-cache:/cache
+    env_file:
+      - .env
     restart: always
+    healthcheck:
+      disable: false
+
+  redis:
+    container_name: immich_redis
+    image: docker.io/valkey/valkey:9
+    healthcheck:
+      test: redis-cli ping | grep -q PONG || exit 1
+    restart: always
+
+  database:
+    container_name: immich_postgres
+    image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0 # Official Immich DB
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_DB: ${DB_DATABASE_NAME}
+      POSTGRES_INITDB_ARGS: '--data-checksums'
+    volumes:
+      - ${DB_DATA_LOCATION}:/var/lib/postgresql/data
+    shm_size: 128mb
+    restart: always
+    healthcheck:
+      disable: false
+
+volumes:
+  model-cache:
 ```
+
+### Migration from Official Immich
+If you already have official Immich running, you do **not** need to recreate your database or change your volumes. Simply change the `immich-server` image in your existing `docker-compose.yml`:
+```diff
+- image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
++ image: ghcr.io/sirentr0pyy/immiguel-server:latest
+```
+And apply the change:
+```bash
+docker compose up -d
+```
+All migrations, database tables, machine learning models, and Redis stay 100% compatible. You can revert back to official Immich at any time with zero manual database intervention.
 
 See [docker/docker-compose.yml](docker/docker-compose.yml) and [docker/docker-compose.prod.yml](docker/docker-compose.prod.yml) for full deployment configurations.
 
