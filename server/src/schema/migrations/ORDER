@@ -94,7 +94,6 @@
 1786972746372-AssetOcrSyncReset
 1787148183729-ClusterGroups
 1787148183730-DeleteMismatchedMemoryAssets
-1787148199999-CreateUploadSessionTable
 1789419229196-ConvertUserOAuthIdEmptyStringToNull
 1790587508209-RenameGeoNamesCountries
 1790616293884-PersonSharing
@@ -105,3 +104,4 @@
 1792568637987-AddAssetOwnerIdUpdateIdIndex
 1795125596774-AddAssetVideoIsFragmented
 1795460399401-AddSessionSyncCheckpointIsPendingReset
+1795500000000-CreateUploadSessionTable
