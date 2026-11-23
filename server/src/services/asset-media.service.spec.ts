@@ -604,7 +604,7 @@ describe(AssetMediaService.name, () => {
       expect(result).toEqual(
         expect.objectContaining({
           uploadId: expect.any(String),
-          chunkSize: 99 * 1024 * 1024,
+          chunkSize: 50 * 1024 * 1024,
           status: UploadStatus.INITIALIZED,
         }),
       );

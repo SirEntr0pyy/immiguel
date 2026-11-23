@@ -175,5 +175,65 @@ describe(AssetMediaController.name, () => {
         expect(service.viewThumbnail).not.toHaveBeenCalled();
       });
     });
+
+    describe('Chunked upload endpoints', () => {
+      it('should initialize chunked upload', async () => {
+        const uploadId = factory.uuid();
+        service.initUpload.mockResolvedValue({
+          uploadId,
+          chunkSize: 50 * 1024 * 1024,
+          status: 'initialized' as any,
+        });
+
+        const { status, body } = await request(ctx.getHttpServer())
+          .post('/assets/upload/init')
+          .send({
+            filename: 'test.mp4',
+            fileSize: 1000000,
+            checksum: 'd2947b871a706081be194569951b7db246907957',
+            fileCreatedAt: new Date().toISOString(),
+            fileModifiedAt: new Date().toISOString(),
+          });
+
+        expect(status).toBe(201);
+        expect(body).toEqual(expect.objectContaining({ uploadId, status: 'initialized' }));
+        expect(service.initUpload).toHaveBeenCalled();
+      });
+
+      it('should upload a chunk', async () => {
+        const uploadId = factory.uuid();
+        service.uploadChunk.mockResolvedValue({
+          uploadId,
+          chunkIndex: 0,
+          received: 3,
+          status: 'in_progress' as any,
+        });
+
+        const { status, body } = await request(ctx.getHttpServer())
+          .post(`/assets/upload/${uploadId}/chunk/0`)
+          .attach('assetData', assetData, 'chunk-0');
+
+        expect(status).toBe(201);
+        expect(body).toEqual(expect.objectContaining({ uploadId, chunkIndex: 0 }));
+        expect(service.uploadChunk).toHaveBeenCalled();
+      });
+
+      it('should complete chunked upload', async () => {
+        const uploadId = factory.uuid();
+        const assetId = factory.uuid();
+        service.completeUpload.mockResolvedValue({
+          id: assetId,
+          status: AssetMediaStatus.CREATED,
+        });
+
+        const { status, body } = await request(ctx.getHttpServer())
+          .post(`/assets/upload/${uploadId}/complete`)
+          .send({});
+
+        expect(status).toBe(201);
+        expect(body).toEqual({ id: assetId, status: AssetMediaStatus.CREATED });
+        expect(service.completeUpload).toHaveBeenCalled();
+      });
+    });
   });
 });
