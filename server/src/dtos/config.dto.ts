@@ -828,7 +828,7 @@ export const defaults = Object.freeze<SystemConfig>({
   upload: {
     chunkedUpload: {
       enabled: true,
-      maxChunkSize: 99 * 1024 * 1024,
+      maxChunkSize: 50 * 1024 * 1024,
     },
   },
   theme: {

@@ -1,0 +1,125 @@
+name: Build Immiguel (Docker & Android APK)
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_docker:
+        description: 'Build Immiguel Server Docker image'
+        type: boolean
+        default: true
+      build_apk:
+        description: 'Build Immiguel Android APK'
+        type: boolean
+        default: true
+      push_docker:
+        description: 'Push Docker image to GitHub Container Registry'
+        type: boolean
+        default: true
+  push:
+    branches:
+      - main
+      - feat/immiguel
+    tags:
+      - 'v*'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-immiguel-docker:
+    name: Build Immiguel Server Docker Image
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.build_docker }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.push_docker }}
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/immiguel-server
+          tags: |
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feat/immiguel' }}
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: server/Dockerfile
+          push: ${{ (github.event_name != 'workflow_dispatch' || inputs.push_docker) && !github.event.pull_request.head.repo.fork }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  build-immiguel-apk:
+    name: Build Immiguel Android APK
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.build_apk }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+
+      - name: Setup Mise
+        uses: jdx/mise-action@v2
+        with:
+          install: true
+          cache: true
+
+      - name: Install dependencies
+        run: mise //mobile:install:ci
+
+      - name: Perform codegen
+        run: mise //mobile:codegen
+
+      - name: Build Android Release APK
+        working-directory: ./mobile
+        run: |
+          flutter build apk --release
+          cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/immiguel.apk
+
+      - name: Upload Immiguel APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: immiguel-android-apk
+          path: mobile/build/app/outputs/flutter-apk/immiguel.apk
+          if-no-files-found: error

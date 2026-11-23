@@ -2,12 +2,11 @@
 java = "21.0.2"
 ruby = "3.4.12"
 # RUSTUP_TOOLCHAIN makes rustup ignore the targets in rust-toolchain.toml, so the cross targets are listed here too.
-rust = { version = "1.99.1", targets = "aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android,aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios" }
+rust = { version = "1.99.1", targets = "aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android" }
 "conda:nasm" = "2.16.03" # assembles rav1d's x86 kernels
 
 [tools."aqua:flutter/flutter"]
 version = "3.47.9"
-postinstall = "bash {{config_root}}/ios/scripts/xcode_flutter_patch.sh"
 
 [tools."github:CQLabs/homebrew-dcm"]
 version = "1.39.1"
@@ -25,8 +24,8 @@ windows-x64 = { asset_pattern = "dcm-windows-release.zip" }
 description = "Clean all build/codegen artifacts"
 run = [
     "flutter clean",
-    "rm -rf generated lib/generated test/drift/main/generated ios/build ios/Pods android/.gradle",
-    "rm -f ios/Build.log lib/routing/router.gr.dart",
+    "rm -rf generated lib/generated test/drift/main/generated android/.gradle",
+    "rm -f lib/routing/router.gr.dart",
     "find lib \\( -name '*.g.dart' -o -name '*.drift.dart' -o -name '*.freezed.dart' \\) -delete",
 ]
 
@@ -167,13 +166,8 @@ run = [
 description = "Bring a checkout up to date after switching branches"
 run = [
   { task = "install" },
-  { task = "checkout:ios" },
   { task = "codegen" },
 ]
-
-[tasks."checkout:ios"]
-description = "Bring the iOS project up to date after switching branches"
-run = "bash ./scripts/checkout_ios.sh"
 
 [tasks.start]
 alias = "start"
