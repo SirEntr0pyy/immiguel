@@ -1,0 +1,98 @@
+name: Sync with Upstream
+
+on:
+  schedule:
+    - cron: '0 4 * * *' # Runs daily at 04:00 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sync-upstream:
+    name: Sync with Upstream Immich
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      actions: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch upstream changes
+        run: |
+          git remote add upstream https://github.com/immich-app/immich.git || git remote set-url upstream https://github.com/immich-app/immich.git
+          git fetch upstream main --tags
+
+      - name: Check for upstream commits
+        id: check
+        run: |
+          BEHIND_COUNT=$(git rev-list --count HEAD..upstream/main)
+          echo "behind_count=${BEHIND_COUNT}" >> "$GITHUB_OUTPUT"
+          echo "Commits behind upstream: ${BEHIND_COUNT}"
+
+      - name: Merge upstream and preserve Immiguel principles
+        if: ${{ steps.check.outputs.behind_count > 0 }}
+        id: merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Attempting merge of upstream/main into main..."
+          if git merge upstream/main -m "chore(sync): sync with upstream immich-app/immich"; then
+            echo "Merge succeeded cleanly. Preserving Immiguel principles..."
+
+            # 1. Ensure iOS stays removed
+            if [ -d "mobile/ios" ]; then
+              rm -rf mobile/ios
+              git add mobile/ios || true
+            fi
+
+            # 2. Preserve custom Android package ID
+            sed -i 's/applicationId "app.alextran.immich"/applicationId "com.sirentr0pyy.immiguel"/' mobile/android/app/build.gradle
+
+            # 3. Preserve custom version checker URL
+            sed -i "s|'https://version.immich.cloud/version'|process.env.IMMICH_VERSION_CHECK_URL ?? 'https://api.github.com/repos/SirEntr0pyy/immiguel/releases/latest'|" server/src/repositories/config.repository.ts
+
+            # Commit any adjustments if modified
+            if ! git diff --quiet; then
+              git commit -am "chore(immiguel): preserve Immiguel principles (no iOS, isolated package ID, custom update check)"
+            fi
+
+            echo "Pushing synced branch to origin main..."
+            git push origin main
+            echo "Triggering Immiguel build pipeline..."
+            gh workflow run build-immiguel.yml --ref main
+            echo "Synced successfully with upstream and triggered build!"
+          else
+            echo "Merge conflict detected! Aborting merge and reporting..."
+            git merge --abort
+
+            DATE_TAG=$(date +'%Y%m%d%H%M%S')
+            BRANCH_NAME="sync-upstream-${DATE_TAG}"
+
+            git checkout -b "$BRANCH_NAME"
+            # Attempt merge again allowing conflict markers so a PR can be reviewed
+            git merge upstream/main || true
+            git push origin "$BRANCH_NAME"
+
+            gh pr create \
+              --base main \
+              --head "$BRANCH_NAME" \
+              --title "⚠️ Upstream Sync Conflicts (${DATE_TAG})" \
+              --body "Automatic sync with \`immich-app/immich:main\` encountered merge conflicts. Please review and resolve the conflicting files." \
+              || gh issue create \
+                --title "⚠️ Upstream Sync Conflicts (${DATE_TAG})" \
+                --body "Automatic sync with \`immich-app/immich:main\` encountered merge conflicts on branch \`${BRANCH_NAME}\`. Please resolve them."
+          fi
