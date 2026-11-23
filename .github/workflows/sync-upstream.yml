@@ -50,49 +50,64 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "Attempting merge of upstream/main into main..."
-          if git merge upstream/main -m "chore(sync): sync with upstream immich-app/immich"; then
-            echo "Merge succeeded cleanly. Preserving Immiguel principles..."
+          git merge upstream/main -m "chore(sync): sync with upstream immich-app/immich" || true
 
-            # 1. Ensure iOS stays removed
-            if [ -d "mobile/ios" ]; then
-              rm -rf mobile/ios
-              git add mobile/ios || true
-            fi
+          # Auto-resolve known customized files by preserving Immiguel versions
+          if git status --porcelain | grep -q 'README.md'; then
+            echo "Preserving Immiguel README.md..."
+            git checkout --ours README.md
+            git add README.md
+          fi
 
-            # 2. Preserve custom Android package ID
-            sed -i 's/applicationId "app.alextran.immich"/applicationId "com.sirentr0pyy.immiguel"/' mobile/android/app/build.gradle
-
-            # 3. Preserve custom version checker URL
-            sed -i "s|'https://version.immich.cloud/version'|process.env.IMMICH_VERSION_CHECK_URL ?? 'https://api.github.com/repos/SirEntr0pyy/immiguel/releases/latest'|" server/src/repositories/config.repository.ts
-
-            # Commit any adjustments if modified
-            if ! git diff --quiet; then
-              git commit -am "chore(immiguel): preserve Immiguel principles (no iOS, isolated package ID, custom update check)"
-            fi
-
-            echo "Pushing synced branch to origin main..."
-            git push origin main
-            echo "Triggering Immiguel build pipeline..."
-            gh workflow run build-immiguel.yml --ref main
-            echo "Synced successfully with upstream and triggered build!"
-          else
-            echo "Merge conflict detected! Aborting merge and reporting..."
+          # If any unmerged files remain
+          UNMERGED=$(git status --porcelain | grep '^UU ' || true)
+          if [ -n "$UNMERGED" ]; then
+            echo "Unresolvable merge conflicts detected in:"
+            echo "$UNMERGED"
             git merge --abort
 
             DATE_TAG=$(date +'%Y%m%d%H%M%S')
             BRANCH_NAME="sync-upstream-${DATE_TAG}"
 
             git checkout -b "$BRANCH_NAME"
-            # Attempt merge again allowing conflict markers so a PR can be reviewed
             git merge upstream/main || true
             git push origin "$BRANCH_NAME"
 
-            gh pr create \
-              --base main \
-              --head "$BRANCH_NAME" \
-              --title "⚠️ Upstream Sync Conflicts (${DATE_TAG})" \
-              --body "Automatic sync with \`immich-app/immich:main\` encountered merge conflicts. Please review and resolve the conflicting files." \
-              || gh issue create \
-                --title "⚠️ Upstream Sync Conflicts (${DATE_TAG})" \
-                --body "Automatic sync with \`immich-app/immich:main\` encountered merge conflicts on branch \`${BRANCH_NAME}\`. Please resolve them."
+            echo "### ⚠️ Upstream Sync Conflicts Detected" >> "$GITHUB_STEP_SUMMARY"
+            echo "Automatic sync with \`immich-app/immich:main\` encountered conflicts on branch \`${BRANCH_NAME}\`." >> "$GITHUB_STEP_SUMMARY"
+            echo "Conflicting files:" >> "$GITHUB_STEP_SUMMARY"
+            echo "\`\`\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "$UNMERGED" >> "$GITHUB_STEP_SUMMARY"
+            echo "\`\`\`" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
           fi
+
+          # Conclude merge if in progress
+          if [ -f .git/MERGE_HEAD ]; then
+            git commit -m "chore(sync): sync with upstream immich-app/immich"
+          fi
+
+          echo "Merge clean! Preserving Immiguel principles..."
+
+          # 1. Ensure iOS stays removed
+          if [ -d "mobile/ios" ]; then
+            rm -rf mobile/ios
+            git add mobile/ios || true
+          fi
+
+          # 2. Preserve custom Android package ID
+          sed -i 's/applicationId "app.alextran.immich"/applicationId "com.sirentr0pyy.immiguel"/' mobile/android/app/build.gradle
+
+          # 3. Preserve custom version checker URL
+          sed -i "s|'https://version.immich.cloud/version'|process.env.IMMICH_VERSION_CHECK_URL ?? 'https://api.github.com/repos/SirEntr0pyy/immiguel/releases/latest'|" server/src/repositories/config.repository.ts
+
+          # Commit any adjustments if modified
+          if ! git diff --quiet; then
+            git commit -am "chore(immiguel): preserve Immiguel principles (no iOS, isolated package ID, custom update check)"
+          fi
+
+          echo "Pushing synced branch to origin main..."
+          git push origin main
+          echo "Triggering Immiguel build pipeline..."
+          gh workflow run build-immiguel.yml --ref main || true
+          echo "Synced successfully with upstream and triggered build!"
