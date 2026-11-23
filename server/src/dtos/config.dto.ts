@@ -412,6 +412,22 @@ const AdminConfigSchemaWithVisibility = z
         days: z.int().min(0).describe('Days').meta({ visibility: User }),
       })
       .meta({ id: 'AdminConfigTrashDto' }),
+    upload: z
+      .object({
+        chunkedUpload: z
+          .object({
+            enabled: configBool.default(true).describe('Enable chunked/resumable uploads').meta({ visibility: User }),
+            maxChunkSize: z.coerce
+              .number()
+              .int()
+              .min(1)
+              .max(100 * 1024 * 1024)
+              .describe('Maximum chunk size in bytes for chunked uploads')
+              .meta({ visibility: User }),
+          })
+          .meta({ id: 'AdminConfigChunkedUploadDto' }),
+      })
+      .meta({ id: 'AdminConfigUploadDto' }),
     theme: z.object({ customCss: z.string().describe('Custom CSS for theming') }).meta({ id: 'AdminConfigThemeDto' }),
     library: z
       .object({
@@ -808,6 +824,12 @@ export const defaults = Object.freeze<SystemConfig>({
   trash: {
     enabled: true,
     days: 30,
+  },
+  upload: {
+    chunkedUpload: {
+      enabled: true,
+      maxChunkSize: 99 * 1024 * 1024,
+    },
   },
   theme: {
     customCss: '',

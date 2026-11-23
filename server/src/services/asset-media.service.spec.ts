@@ -4,10 +4,13 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { Readable, Writable } from 'node:stream';
+import type { UploadBody } from 'src/types.js';
 import { AssetFile } from 'src/database.js';
 import { AssetMediaStatus, AssetRejectReason, AssetUploadAction } from 'src/dtos/asset-media-response.dto.js';
 import { AssetMediaCreateDto, AssetMediaSize, UploadFieldName } from 'src/dtos/asset-media.dto.js';
 import { MapAsset } from 'src/dtos/asset-response.dto.js';
+import { UploadStatus } from 'src/dtos/asset-upload.dto.js';
 import { AssetEditAction } from 'src/dtos/editing.dto.js';
 import { AssetFileType, AssetType, AssetVisibility, CacheControl, JobName } from 'src/enum.js';
 import { AuthRequest } from 'src/middleware/auth.guard.js';
@@ -25,6 +28,26 @@ import { getForAsset } from 'test/mappers.js';
 import { ServiceMocks, newTestService } from 'test/utils.js';
 
 const file1 = Buffer.from('d2947b871a706081be194569951b7db246907957', 'hex');
+
+/** sha1 hex of the chunk content "data" used in the chunked-upload tests */
+const uploadChunkChecksum = 'a17c9aaa61e80a1bf71d0d850af4e5baa9800bbd';
+
+const uploadChunkDto = {
+  fileCreatedAt: new Date('2026-01-01T00:00:00.000Z'),
+  fileModifiedAt: new Date('2026-01-01T00:00:00.000Z'),
+  filename: 'image.jpg',
+  fileSize: 100,
+  checksum: uploadChunkChecksum,
+};
+
+const uploadChunkId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const uploadChunkFile = {
+  uuid: 'random-uuid',
+  checksum: Buffer.from(uploadChunkChecksum, 'hex'),
+  originalPath: '/path/to/chunk.jpg',
+  originalName: 'image.jpg',
+  size: 100,
+};
 
 const uploadFile = {
   nullAuth: {
@@ -176,6 +199,26 @@ describe(AssetMediaService.name, () => {
 
   beforeEach(() => {
     ({ sut, mocks } = newTestService(AssetMediaService));
+
+    // In-memory fake of the upload_session repository for the chunked-upload tests.
+    const sessions = new Map<string, Record<string, any>>();
+    mocks.uploadSession.create.mockImplementation(((dto: any) => {
+      const session = { ...dto, createdAt: new Date(), updatedAt: new Date() };
+      sessions.set(dto.id, session);
+      return Promise.resolve(session);
+    }) as any);
+    mocks.uploadSession.get.mockImplementation(((_userId: string, id: string) =>
+      Promise.resolve(sessions.get(id))) as any);
+    mocks.uploadSession.update.mockImplementation(((id: string, dto: any) => {
+      const existing = sessions.get(id);
+      const updated = { ...existing, ...dto };
+      sessions.set(id, updated);
+      return Promise.resolve(updated);
+    }) as any);
+    mocks.uploadSession.delete.mockImplementation(((id: string) => {
+      sessions.delete(id);
+      return Promise.resolve();
+    }) as any);
   });
 
   describe('getUploadAssetIdByChecksum', () => {
@@ -531,6 +574,167 @@ describe(AssetMediaService.name, () => {
         new Date(createDto.fileModifiedAt),
       );
       expect(mocks.asset.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('initUpload', () => {
+    it('should require authentication', async () => {
+      await expect(sut.initUpload(null as any, uploadChunkDto)).rejects.toBeInstanceOf(UnauthorizedException);
+    });
+
+    it('should reject an unsupported file type', async () => {
+      await expect(sut.initUpload(authStub.admin, { ...uploadChunkDto, filename: 'file.txt' })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+    });
+
+    it('should return a duplicate if the asset already exists', async () => {
+      mocks.asset.getUploadAssetIdByChecksum.mockResolvedValue('asset-id');
+      const result = await sut.initUpload(authStub.admin, uploadChunkDto);
+      expect(result).toEqual(
+        expect.objectContaining({
+          status: UploadStatus.COMPLETED,
+          duplicate: true,
+          assetId: 'asset-id',
+        }),
+      );
+    });
+
+    it('should initialize a session', async () => {
+      const result = await sut.initUpload(authStub.admin, uploadChunkDto);
+      expect(result).toEqual(
+        expect.objectContaining({
+          uploadId: expect.any(String),
+          chunkSize: 99 * 1024 * 1024,
+          status: UploadStatus.INITIALIZED,
+        }),
+      );
+      expect(mocks.storage.mkdirSync).toHaveBeenCalled();
+    });
+  });
+
+  describe('uploadChunk', () => {
+    it('should require authentication', async () => {
+      await expect(sut.uploadChunk(null as any, uploadChunkId, 0, uploadChunkFile)).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
+    });
+
+    it('should append a chunk and update the received count', async () => {
+      const { uploadId } = await sut.initUpload(authStub.admin, { ...uploadChunkDto, fileSize: 200 });
+      mocks.storage.createReadStream.mockResolvedValue({ stream: Readable.from(['data']) } as any);
+      mocks.storage.createAppendStream.mockReturnValue(
+        new Writable({
+          write(_chunk, _enc, cb) {
+            cb();
+          },
+        }) as any,
+      );
+
+      const result = await sut.uploadChunk(authStub.admin, uploadId, 0, { ...uploadChunkFile, size: 100 });
+      expect(result).toEqual(
+        expect.objectContaining({ uploadId, chunkIndex: 0, received: 100, status: UploadStatus.IN_PROGRESS }),
+      );
+      expect(mocks.storage.createAppendStream).toHaveBeenCalled();
+    });
+
+    it('should mark the upload as completed when all bytes are received', async () => {
+      const { uploadId } = await sut.initUpload(authStub.admin, { ...uploadChunkDto, fileSize: 100 });
+      mocks.storage.createReadStream.mockResolvedValue({ stream: Readable.from(['data']) } as any);
+      mocks.storage.createAppendStream.mockReturnValue(
+        new Writable({
+          write(_chunk, _enc, cb) {
+            cb();
+          },
+        }) as any,
+      );
+
+      const result = await sut.uploadChunk(authStub.admin, uploadId, 0, { ...uploadChunkFile, size: 100 });
+      expect(result.status).toBe(UploadStatus.COMPLETED);
+    });
+
+    it('should throw if the session does not exist', async () => {
+      await expect(sut.uploadChunk(authStub.admin, uploadChunkId, 0, uploadChunkFile)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+  });
+
+  describe('getUploadStatus', () => {
+    it('should return the current status', async () => {
+      const { uploadId } = await sut.initUpload(authStub.admin, uploadChunkDto);
+      await expect(sut.getUploadStatus(authStub.admin, uploadId)).resolves.toEqual(
+        expect.objectContaining({ uploadId, received: 0, status: UploadStatus.INITIALIZED }),
+      );
+    });
+  });
+
+  describe('completeUpload', () => {
+    it('should throw if the upload is not complete', async () => {
+      const { uploadId } = await sut.initUpload(authStub.admin, uploadChunkDto);
+      await expect(sut.completeUpload(authStub.admin, uploadId, {})).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('should verify the size and checksum and create the asset', async () => {
+      const { uploadId } = await sut.initUpload(authStub.admin, { ...uploadChunkDto, fileSize: 100 });
+      mocks.storage.createReadStream.mockResolvedValue({ stream: Readable.from(['data']) } as any);
+      mocks.storage.createAppendStream.mockReturnValue(
+        new Writable({
+          write(_chunk, _enc, cb) {
+            cb();
+          },
+        }) as any,
+      );
+      await sut.uploadChunk(authStub.admin, uploadId, 0, { ...uploadChunkFile, size: 100 });
+
+      mocks.storage.stat.mockResolvedValue({ size: 100 } as any);
+      mocks.storage.createReadStream.mockImplementation(() =>
+        Promise.resolve({ stream: Readable.from(['data']) } as any),
+      );
+
+      const asset = AssetFactory.create();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([authStub.admin.user.id]));
+      mocks.asset.create.mockImplementation((dto: any) => {
+        // The asset's originalPath is the assembled session path; capture it to verify
+        // the file is preserved (not unlinked) on success.
+        expect(dto.originalPath).toBeDefined();
+        return Promise.resolve(asset);
+      });
+
+      await expect(sut.completeUpload(authStub.admin, uploadId, {})).resolves.toEqual({
+        id: asset.id,
+        status: AssetMediaStatus.CREATED,
+      });
+
+      // On successful completion the assembled file is owned by the new asset, so it
+      // must be preserved (not unlinked). The only unlink allowed is the chunk-temp
+      // cleanup for the uploaded chunk file.
+      const unlinked = mocks.storage.unlink.mock.calls.map(([p]: any) => p);
+      expect(unlinked).toEqual(['/path/to/chunk.jpg']);
+    });
+
+    it('should throw on checksum mismatch', async () => {
+      const { uploadId } = await sut.initUpload(authStub.admin, { ...uploadChunkDto, fileSize: 100 });
+      mocks.storage.createReadStream.mockResolvedValue({ stream: Readable.from(['different']) } as any);
+      mocks.storage.createAppendStream.mockReturnValue(
+        new Writable({
+          write(_chunk, _enc, cb) {
+            cb();
+          },
+        }) as any,
+      );
+      await sut.uploadChunk(authStub.admin, uploadId, 0, { ...uploadChunkFile, size: 100 });
+
+      mocks.storage.stat.mockResolvedValue({ size: 100 } as any);
+      await expect(sut.completeUpload(authStub.admin, uploadId, {})).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
+  describe('cancelUpload', () => {
+    it('should cancel and clean up the session', async () => {
+      const { uploadId } = await sut.initUpload(authStub.admin, uploadChunkDto);
+      await expect(sut.cancelUpload(authStub.admin, uploadId)).resolves.toBeUndefined();
+      expect(mocks.storage.unlink).toHaveBeenCalled();
     });
   });
 

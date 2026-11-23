@@ -14,14 +14,20 @@ import {
   checkBulkUpload,
   getBaseUrl,
   type AssetMediaResponseDto,
+  type ServerConfigDto,
 } from '@immich/sdk';
 import { toastManager } from '@immich/ui';
 import { tick } from 'svelte';
 import { t } from 'svelte-i18n';
 import { get } from 'svelte/store';
+import { queryClient } from '#lib/queries/client.ts';
+import { QueryKeys } from '#lib/queries/query-keys.ts';
 import { handleError } from './handle-error';
 
 export const uploadExecutionQueue = new ExecutorQueue({ concurrency: 2 });
+
+/** Files larger than this use the resumable/chunked upload protocol. */
+export const CHUNKED_UPLOAD_THRESHOLD_BYTES = 50 * 1024 * 1024;
 
 type FilePickerParam = { multiple?: boolean; extensions?: string[] };
 type FileUploadParam = { multiple?: boolean; albumId?: string };
@@ -138,6 +144,83 @@ function hashFile(file: File): Promise<string> {
   });
 }
 
+type UploadInitResponse = {
+  uploadId: string;
+  chunkSize: number;
+  status: AssetMediaStatus;
+  duplicate?: boolean;
+  assetId?: string;
+};
+
+async function uploadChunked(
+  assetFile: File,
+  deviceAssetId: string,
+  isLockedAssets = false,
+): Promise<{ id: string; status: AssetMediaStatus }> {
+  const base = getBaseUrl();
+  const params = asQueryString(authManager.params);
+  const suffix = params ? `?${params}` : '';
+
+  const checksum = await hashFile(assetFile);
+  const fileCreatedAt = new Date(assetFile.lastModified).toISOString();
+
+  const initResponse = await uploadRequest<UploadInitResponse>({
+    url: `${base}/assets/upload/init${suffix}`,
+    data: {
+      filename: assetFile.name,
+      fileSize: assetFile.size.toString(),
+      checksum,
+      fileCreatedAt,
+      fileModifiedAt: fileCreatedAt,
+      isFavorite: 'false',
+      ...(isLockedAssets ? { visibility: AssetVisibility.Locked } : {}),
+    },
+  });
+
+  if (initResponse.data.duplicate && initResponse.data.assetId) {
+    return { id: initResponse.data.assetId, status: AssetMediaStatus.Duplicate };
+  }
+
+  const uploadId = initResponse.data.uploadId;
+  const chunkSize = initResponse.data.chunkSize;
+
+  let chunkIndex = 0;
+  let bytesUploaded = 0;
+  for (let offset = 0; offset < assetFile.size; offset += chunkSize) {
+    const chunk = assetFile.slice(offset, Math.min(offset + chunkSize, assetFile.size));
+    const chunkFile = new File([chunk], assetFile.name, { type: assetFile.type });
+    await uploadRequest({
+      url: `${base}/assets/upload/${uploadId}/chunk/${chunkIndex}${suffix}`,
+      data: toFormData({ assetData: chunkFile }),
+      onUploadProgress: (event) =>
+        uploadAssetsStore.updateProgress(deviceAssetId, bytesUploaded + event.loaded, assetFile.size),
+    });
+    // The chunk upload completes when this request resolves, so add its size to
+    // the running total for the next chunk's progress calculation.
+    bytesUploaded += chunk.size;
+    chunkIndex++;
+  }
+
+  const completeResponse = await uploadRequest<AssetMediaResponseDto>({
+    url: `${base}/assets/upload/${uploadId}/complete${suffix}`,
+    data: {},
+  });
+
+  return { id: completeResponse.data.id, status: completeResponse.data.status };
+}
+
+const toFormData = (fields: Record<string, unknown>): FormData => {
+  const formData = new FormData();
+  for (const [key, value] of Object.entries(fields)) {
+    if (value instanceof File || value instanceof Blob) {
+      formData.append(key, value, (value as File).name);
+    } else if (value !== undefined && value !== null) {
+      formData.append(key, String(value));
+    }
+  }
+  return formData;
+};
+
 type FileUploaderParams = {
   assetFile: File;
   albumId?: string;
@@ -201,17 +284,24 @@ async function fileUploader({
       const queryParams = asQueryString(authManager.params);
 
       uploadAssetsStore.updateItem(deviceAssetId, { message: $t('asset_uploading') });
-      const response = await uploadRequest<AssetMediaResponseDto>({
-        url: getBaseUrl() + '/assets' + (queryParams ? `?${queryParams}` : ''),
-        data: formData,
-        onUploadProgress: (event) => uploadAssetsStore.updateProgress(deviceAssetId, event.loaded, event.total),
-      });
 
-      if (![200, 201].includes(response.status)) {
-        throw new Error($t('errors.unable_to_upload_file'));
+      const serverConfig = queryClient.getQueryData(QueryKeys.serverConfig()) as ServerConfigDto | undefined;
+      const chunkedEnabled = serverConfig?.chunkedUploadEnabled ?? true;
+      if (chunkedEnabled && assetFile.size > CHUNKED_UPLOAD_THRESHOLD_BYTES && !authManager.isSharedLink) {
+        responseData = await uploadChunked(assetFile, deviceAssetId, isLockedAssets);
+      } else {
+        const response = await uploadRequest<AssetMediaResponseDto>({
+          url: getBaseUrl() + '/assets' + (queryParams ? `?${queryParams}` : ''),
+          data: formData,
+          onUploadProgress: (event) => uploadAssetsStore.updateProgress(deviceAssetId, event.loaded, event.total),
+        });
+
+        if (![200, 201].includes(response.status)) {
+          throw new Error($t('errors.unable_to_upload_file'));
+        }
+
+        responseData = response.data;
       }
-
-      responseData = response.data;
     }
 
     if (responseData.status === AssetMediaStatus.Duplicate) {

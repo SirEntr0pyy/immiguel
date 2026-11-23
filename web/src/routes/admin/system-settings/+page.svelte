@@ -25,6 +25,7 @@
     mdiRobotOutline,
     mdiServerOutline,
     mdiSync,
+    mdiCloudUploadOutline,
     mdiTrashCanOutline,
     mdiUpdate,
     mdiVideoOutline,
@@ -49,6 +50,7 @@
   import ServerSettings from './ServerSettings.svelte';
   import ThemeSettings from './ThemeSettings.svelte';
   import TrashSettings from './TrashSettings.svelte';
+  import UploadSettings from './UploadSettings.svelte';
   import UserSettings from './UserSettings.svelte';
 
   type Props = {
@@ -178,6 +180,13 @@
       subtitle: $t('admin.trash_settings_description'),
       key: 'trash',
       icon: mdiTrashCanOutline,
+    },
+    {
+      component: UploadSettings,
+      title: $t('admin.upload_settings'),
+      subtitle: $t('admin.upload_settings_description'),
+      key: 'upload',
+      icon: mdiCloudUploadOutline,
     },
     {
       component: UserSettings,
