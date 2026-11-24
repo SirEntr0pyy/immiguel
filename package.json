@@ -1,6 +1,6 @@
 {
   "name": "immich-monorepo",
-  "version": "2026.11.18",
+  "version": "2026.11.24",
   "description": "Monorepo for Immich",
   "type": "module",
   "private": true,

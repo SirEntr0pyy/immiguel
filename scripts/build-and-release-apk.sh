@@ -13,18 +13,34 @@ echo "=========================================="
 echo "🚀 Immiguel Local APK Builder"
 echo "=========================================="
 
-# 1. Determine Version
-VERSION="${1:-}"
+# 1. Determine Version & Flags
+NO_PUBLISH=false
+VERSION=""
+
+for arg in "$@"; do
+  if [ "$arg" == "--no-publish" ]; then
+    NO_PUBLISH=true
+  elif [ -z "$VERSION" ]; then
+    VERSION="$arg"
+  fi
+done
+
+# If no version is specified, dynamically use current execution date (e.g. 2026.11.24)
 if [ -z "$VERSION" ]; then
-  # Read version from mobile/pubspec.yaml (ignoring build number)
-  VERSION=$(grep '^version:' mobile/pubspec.yaml | sed -E 's/version: ([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
+  VERSION=$(date +"%Y.%m.%d")
+fi
+
+BUILD_NUMBER=$(date +"%-d")
+# Synchronize mobile/pubspec.yaml with today's date
+if [ -f "mobile/pubspec.yaml" ]; then
+  sed -i -E "s/^version: .*/version: ${VERSION}+${BUILD_NUMBER}/" mobile/pubspec.yaml
 fi
 
 TAG="v${VERSION}"
 echo "📦 Building Immiguel APK for version: $VERSION ($TAG)"
 
 # 2. Check mise / flutter
-export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+export PATH="/usr/sbin:/sbin:$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
 
 if ! command -v mise >/dev/null 2>&1; then
   echo "Installing mise..."
@@ -50,21 +66,30 @@ if [ -n "${ANDROID_HOME:-}" ]; then
   export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
 fi
 
+if [ -z "${ANDROID_HOME:-}" ] || [ ! -d "$ANDROID_HOME" ]; then
+  echo "❌ Error: Android SDK not found! Please set ANDROID_HOME or install Android SDK to ~/Android/Sdk"
+  exit 1
+fi
+
 # 4. Install dependencies and codegen
-cd "$ROOT_DIR/mobile"
+cd "$ROOT_DIR"
 
 echo "📥 Installing mobile dependencies..."
-mise exec -- flutter pub get
+mise run //mobile:install
 
 echo "⚙️ Generating mobile code..."
-mise exec -- dart run build_runner build --delete-conflicting-outputs || true
+mise run //mobile:codegen
 
 # 5. Build APK
+cd "$ROOT_DIR/mobile"
 echo "🔨 Compiling Android Release APK (ARM & ARM64)..."
-export GRADLE_OPTS="-Dorg.gradle.jvmargs=-Xmx6144m -XX:MaxMetaspaceSize=1024m"
-export _JAVA_OPTIONS="-Xmx6144m"
+export GRADLE_OPTS="-Dorg.gradle.jvmargs=-Xmx3072m -XX:MaxMetaspaceSize=512m -Dorg.gradle.workers.max=4"
+unset _JAVA_OPTIONS 2>/dev/null || true
 
 mise exec -- flutter build apk --release --target-platform android-arm,android-arm64
+
+# Free Gradle daemon memory immediately
+(cd android && ./gradlew --stop >/dev/null 2>&1 || true)
 
 APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
 OUT_APK="build/app/outputs/flutter-apk/immiguel.apk"
@@ -79,7 +104,7 @@ else
 fi
 
 # 6. Publish to GitHub Releases
-if [ "${2:-}" == "--no-publish" ]; then
+if [ "$NO_PUBLISH" = true ]; then
   echo "ℹ️ Skipping publish as requested (--no-publish)."
   exit 0
 fi
@@ -90,12 +115,16 @@ if ! command -v gh >/dev/null 2>&1; then
 fi
 
 echo "🚀 Publishing release $TAG to GitHub..."
-if gh release view "$TAG" >/dev/null 2>&1; then
+# Update git tag to current HEAD and push to remote
+git tag -f "$TAG" HEAD 2>/dev/null || true
+git push -f origin "$TAG" 2>/dev/null || true
+
+if gh release view "$TAG" -R SirEntr0pyy/immiguel >/dev/null 2>&1; then
   echo "Release $TAG already exists. Uploading/overwriting APK asset..."
-  gh release upload "$TAG" "$OUT_APK" --clobber
+  gh release upload "$TAG" "$OUT_APK" --clobber -R SirEntr0pyy/immiguel
 else
   echo "Creating new GitHub Release $TAG..."
-  gh release create "$TAG" "$OUT_APK" \
+  gh release create "$TAG" "$OUT_APK" -R SirEntr0pyy/immiguel \
     --title "Immiguel $TAG" \
     --notes "### Immiguel Release $TAG
 

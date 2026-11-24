@@ -56,15 +56,11 @@ backend = "aqua:flutter/flutter"
 specifiers = ["3.47.9"]
 
 [tools."aqua:flutter/flutter"."platforms.linux-arm64"]
-url = "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.47.9-stable.tar.xz"
-
-[tools."aqua:flutter/flutter"."platforms.linux-arm64-musl"]
+checksum = "sha256:25ed8c3c29d51a7353f2a944310b478af8214920639524b19c50a19e6c044c5a"
 url = "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.47.9-stable.tar.xz"
 
 [tools."aqua:flutter/flutter"."platforms.linux-x64"]
-url = "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.47.9-stable.tar.xz"
-
-[tools."aqua:flutter/flutter"."platforms.linux-x64-musl"]
+checksum = "blake3:b5d3ec5cd207f356d62aa86969b95bad987785aaf420fad5d78d9b3db9c90af3"
 url = "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.47.9-stable.tar.xz"
 
 [tools."aqua:flutter/flutter"."platforms.macos-arm64"]
@@ -72,9 +68,11 @@ checksum = "blake3:b06d3a2c1fcce011d99a13b4cbee7562eee90cd1d069148e5263bc6f49b57
 url = "https://storage.googleapis.com/flutter_infra_release/releases/stable/macos/flutter_macos_arm64_3.47.9-stable.zip"
 
 [tools."aqua:flutter/flutter"."platforms.macos-x64"]
+checksum = "sha256:0dc38b4038a0b002a6258696a5b327a58473c175c9e334b9f329ef7d79a4fdcd"
 url = "https://storage.googleapis.com/flutter_infra_release/releases/stable/macos/flutter_macos_3.47.9-stable.zip"
 
 [tools."aqua:flutter/flutter"."platforms.windows-x64"]
+checksum = "sha256:d8e2b5977e09082c6440f89dc1aa887b94c8fbcc3b39222797046295a3f68a9e"
 url = "https://storage.googleapis.com/flutter_infra_release/releases/stable/windows/flutter_windows_3.47.9-stable.zip"
 
 [[tools."conda:nasm"]]
@@ -131,12 +129,12 @@ backend = "github:CQLabs/homebrew-dcm"
 specifiers = ["1.39.1"]
 
 [tools."github:CQLabs/homebrew-dcm".options]
-asset_pattern = "dcm-macos-arm-release.zip"
+asset_pattern = "dcm-linux-arm-release.zip"
 
-[tools."github:CQLabs/homebrew-dcm"."platforms.macos-arm64"]
-checksum = "sha256:38ad6085e741c0fb1646b9057c4c2e2b627442e063d3837924dd8ed4bb9e0133"
-url = "https://github.com/CQLabs/homebrew-dcm/releases/download/1.39.1/dcm-macos-arm-release.zip"
-url_api = "https://api.github.com/repos/CQLabs/homebrew-dcm/releases/assets/522437676"
+[tools."github:CQLabs/homebrew-dcm"."platforms.linux-arm64"]
+checksum = "sha256:0cab9675ea5435817772176bf744b96358ec0f44f713853910f22538aec2e2c4"
+url = "https://github.com/CQLabs/homebrew-dcm/releases/download/1.39.1/dcm-linux-arm-release.zip"
+url_api = "https://api.github.com/repos/CQLabs/homebrew-dcm/releases/assets/522437777"
 
 [[tools."github:CQLabs/homebrew-dcm"]]
 version = "1.39.1"
@@ -144,12 +142,25 @@ backend = "github:CQLabs/homebrew-dcm"
 specifiers = ["1.39.1"]
 
 [tools."github:CQLabs/homebrew-dcm".options]
-asset_pattern = "dcm-linux-arm-release.zip"
+asset_pattern = "dcm-linux-x64-release.zip"
 
-[tools."github:CQLabs/homebrew-dcm"."platforms.linux-arm64"]
-checksum = "sha256:0cab9675ea5435817772176bf744b96358ec0f44f713853910f22538aec2e2c4"
-url = "https://github.com/CQLabs/homebrew-dcm/releases/download/1.39.1/dcm-linux-arm-release.zip"
-url_api = "https://api.github.com/repos/CQLabs/homebrew-dcm/releases/assets/522437777"
+[tools."github:CQLabs/homebrew-dcm"."platforms.linux-x64"]
+checksum = "sha256:a7a3033f16e03694db866d627865d0baf4befb04993f2c1111757f9613f02c62"
+url = "https://github.com/CQLabs/homebrew-dcm/releases/download/1.39.1/dcm-linux-x64-release.zip"
+url_api = "https://api.github.com/repos/CQLabs/homebrew-dcm/releases/assets/522437735"
+
+[[tools."github:CQLabs/homebrew-dcm"]]
+version = "1.39.1"
+backend = "github:CQLabs/homebrew-dcm"
+specifiers = ["1.39.1"]
+
+[tools."github:CQLabs/homebrew-dcm".options]
+asset_pattern = "dcm-macos-arm-release.zip"
+
+[tools."github:CQLabs/homebrew-dcm"."platforms.macos-arm64"]
+checksum = "sha256:38ad6085e741c0fb1646b9057c4c2e2b627442e063d3837924dd8ed4bb9e0133"
+url = "https://github.com/CQLabs/homebrew-dcm/releases/download/1.39.1/dcm-macos-arm-release.zip"
+url_api = "https://api.github.com/repos/CQLabs/homebrew-dcm/releases/assets/522437676"
 
 [[tools."github:CQLabs/homebrew-dcm"]]
 version = "1.39.1"
@@ -176,19 +187,6 @@ asset_pattern = "dcm-windows-release.zip"
 checksum = "sha256:1b601ad32b5984eb2d6443b04becb3f56eaccfb1e4b591166afb6ee41265f06c"
 url = "https://github.com/CQLabs/homebrew-dcm/releases/download/1.39.1/dcm-windows-release.zip"
 url_api = "https://api.github.com/repos/CQLabs/homebrew-dcm/releases/assets/522437603"
-
-[[tools."github:CQLabs/homebrew-dcm"]]
-version = "1.39.1"
-backend = "github:CQLabs/homebrew-dcm"
-specifiers = ["1.39.1"]
-
-[tools."github:CQLabs/homebrew-dcm".options]
-asset_pattern = "dcm-linux-x64-release.zip"
-
-[tools."github:CQLabs/homebrew-dcm"."platforms.linux-x64"]
-checksum = "sha256:a7a3033f16e03694db866d627865d0baf4befb04993f2c1111757f9613f02c62"
-url = "https://github.com/CQLabs/homebrew-dcm/releases/download/1.39.1/dcm-linux-x64-release.zip"
-url_api = "https://api.github.com/repos/CQLabs/homebrew-dcm/releases/assets/522437735"
 
 [[tools.java]]
 version = "21.0.2"
@@ -223,15 +221,6 @@ version = "3.4.12"
 backend = "core:ruby"
 specifiers = ["3.4.12"]
 
-[tools.ruby."platforms.windows-x64"]
-checksum = "sha256:3806f164377824bcb17e1cf39b17d967e2bdc01e8547ce0254cd786dbe2cfe13"
-url = "https://github.com/oneclick/rubyinstaller2/releases/download/RubyInstaller-3.4.12-1/rubyinstaller-3.4.12-1-x64.7z"
-
-[[tools.ruby]]
-version = "3.4.12"
-backend = "core:ruby"
-specifiers = ["3.4.12"]
-
 [tools.ruby.options]
 compile = "false"
 precompiled_url = "jdx/ruby"
@@ -257,10 +246,19 @@ provenance = "github-attestations"
 checksum = "sha256:5e5d85ad93b0adcccbad47733680f4892bd0078e3342437f7babce01c1872479"
 url = "https://cache.ruby-lang.org/pub/ruby/3.4/ruby-3.4.12.tar.gz"
 
+[[tools.ruby]]
+version = "3.4.12"
+backend = "core:ruby"
+specifiers = ["3.4.12"]
+
+[tools.ruby."platforms.windows-x64"]
+checksum = "sha256:3806f164377824bcb17e1cf39b17d967e2bdc01e8547ce0254cd786dbe2cfe13"
+url = "https://github.com/oneclick/rubyinstaller2/releases/download/RubyInstaller-3.4.12-1/rubyinstaller-3.4.12-1-x64.7z"
+
 [[tools.rust]]
 version = "1.99.1"
 backend = "core:rust"
 specifiers = ["1.99.1"]
 
 [tools.rust.options]
-targets = "aarch64-apple-ios,aarch64-apple-ios-sim,aarch64-linux-android,armv7-linux-androideabi,x86_64-apple-ios,x86_64-linux-android"
+targets = "aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android"
