@@ -3,7 +3,13 @@ name: Sync with Upstream
 on:
   schedule:
     - cron: '0 4 * * *' # Runs daily at 04:00 UTC
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Force sync run'
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
