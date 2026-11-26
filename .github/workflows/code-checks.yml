@@ -31,10 +31,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build SDKs
+      - name: Build SDKs and Native Core
         run: |
           pnpm --filter @immich/sdk build
           pnpm --filter @immich/plugin-sdk build
+          pnpm --filter @immich/native-core build
 
       - name: Check Server TypeScript
         run: pnpm --filter immich check
