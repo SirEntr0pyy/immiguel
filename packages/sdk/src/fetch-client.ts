@@ -1584,11 +1584,19 @@ export type ChangePasswordDto = {
     /** Current password */
     password: string;
 };
-export type LoginCredentialDto = {
-    /** User email */
-    email: string;
-    /** User password */
-    password: string;
+export type AuthCodeCreateDto = {
+    /** PKCE code challenge (S256, base64url) */
+    codeChallenge: string;
+};
+export type AuthCodeResponseDto = {
+    /** One-time code */
+    code: string;
+};
+export type AuthCodeExchangeDto = {
+    /** One-time code */
+    code: string;
+    /** PKCE code verifier (base64url) */
+    codeVerifier: string;
 };
 export type LoginResponseDto = {
     /** Access token */
@@ -1607,6 +1615,12 @@ export type LoginResponseDto = {
     userEmail: string;
     /** User ID */
     userId: string;
+};
+export type LoginCredentialDto = {
+    /** User email */
+    email: string;
+    /** User password */
+    password: string;
 };
 export type LogoutResponseDto = {
     /** Redirect URI */
@@ -5517,6 +5531,36 @@ export function changePassword({ changePasswordDto }: {
     })));
 }
 /**
+ * Create app login code
+ */
+export function createAuthCode({ authCodeCreateDto }: {
+    authCodeCreateDto: AuthCodeCreateDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 201;
+        data: AuthCodeResponseDto;
+    }>("/auth/code", oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: authCodeCreateDto
+    })));
+}
+/**
+ * Exchange app login code
+ */
+export function exchangeAuthCode({ authCodeExchangeDto }: {
+    authCodeExchangeDto: AuthCodeExchangeDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 201;
+        data: LoginResponseDto;
+    }>("/auth/exchange", oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: authCodeExchangeDto
+    })));
+}
+/**
  * Login
  */
 export function login({ loginCredentialDto }: {
@@ -8918,8 +8962,6 @@ export enum JobName {
     LibraryDeleteCheck = "LibraryDeleteCheck",
     LibraryDelete = "LibraryDelete",
     LibraryRemoveAsset = "LibraryRemoveAsset",
-    LibraryScanAssetsQueueAll = "LibraryScanAssetsQueueAll",
-    LibrarySyncAssets = "LibrarySyncAssets",
     LibrarySyncFilesQueueAll = "LibrarySyncFilesQueueAll",
     LibrarySyncFiles = "LibrarySyncFiles",
     LibraryScanQueueAll = "LibraryScanQueueAll",
