@@ -59,8 +59,33 @@ jobs:
             git add README.md
           fi
 
+          # Auto-resolve files deleted in Immiguel that upstream modified (DU)
+          git status --porcelain | grep '^DU ' | awk '{print $2}' | while read -r file; do
+            echo "Removing deleted file modified by upstream: $file"
+            git rm -f "$file" || rm -f "$file"
+          done
+
+          # Ensure iOS stays completely removed
+          if [ -d "mobile/ios" ]; then
+            echo "Removing mobile/ios..."
+            rm -rf mobile/ios
+            git rm -rf mobile/ios 2>/dev/null || true
+          fi
+
+          # Auto-resolve server migration ORDER file from actual migration files on disk
+          if git status --porcelain | grep -q 'server/src/schema/migrations/ORDER'; then
+            echo "Regenerating server/src/schema/migrations/ORDER from migration files on disk..."
+            python3 -c "
+import os
+migrations = sorted([f[:-3] for f in os.listdir('server/src/schema/migrations') if f.endswith('.ts')])
+with open('server/src/schema/migrations/ORDER', 'w') as f:
+    f.write('\n'.join(migrations) + '\n')
+"
+            git add server/src/schema/migrations/ORDER
+          fi
+
           # If any unmerged files remain
-          UNMERGED=$(git status --porcelain | grep '^UU ' || true)
+          UNMERGED=$(git status --porcelain | grep -E '^(DD|AU|UD|UA|DU|AA|UU) ' || true)
           if [ -n "$UNMERGED" ]; then
             echo "Unresolvable merge conflicts detected in:"
             echo "$UNMERGED"
@@ -92,14 +117,14 @@ jobs:
           # 1. Ensure iOS stays removed
           if [ -d "mobile/ios" ]; then
             rm -rf mobile/ios
-            git add mobile/ios || true
+            git rm -rf mobile/ios 2>/dev/null || true
           fi
 
           # 2. Preserve custom Android package ID
           sed -i 's/applicationId "app.alextran.immich"/applicationId "com.sirentr0pyy.immiguel"/' mobile/android/app/build.gradle
 
           # 3. Preserve custom version checker URL
-          sed -i "s|'https://version.immich.cloud/version'|process.env.IMMICH_VERSION_CHECK_URL ?? 'https://api.github.com/repos/SirEntr0pyy/immiguel/releases/latest'|" server/src/repositories/config.repository.ts
+          sed -i "s|url:.*version.*immich\.cloud.*|url: process.env.IMMICH_VERSION_CHECK_URL ?? 'https://api.github.com/repos/SirEntr0pyy/immiguel/releases/latest',|" server/src/repositories/config.repository.ts
 
           # Commit any adjustments if modified
           if ! git diff --quiet; then
