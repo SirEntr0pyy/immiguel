@@ -81,12 +81,7 @@ jobs:
           # Auto-resolve server migration ORDER file from actual migration files on disk
           if git status --porcelain | grep -q 'server/src/schema/migrations/ORDER'; then
             echo "Regenerating server/src/schema/migrations/ORDER from migration files on disk..."
-            python3 -c "
-import os
-migrations = sorted([f[:-3] for f in os.listdir('server/src/schema/migrations') if f.endswith('.ts')])
-with open('server/src/schema/migrations/ORDER', 'w') as f:
-    f.write('\n'.join(migrations) + '\n')
-"
+            python3 -c "import os; migrations = sorted([f[:-3] for f in os.listdir('server/src/schema/migrations') if f.endswith('.ts')]); open('server/src/schema/migrations/ORDER', 'w').write('\n'.join(migrations) + '\n')"
             git add server/src/schema/migrations/ORDER
           fi
 
